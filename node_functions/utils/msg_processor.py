@@ -8,13 +8,11 @@ import socket
 
 
 config = configparser.ConfigParser()
-config.read('manager_functions/utils/config.ini')
+config.read('node_functions/utils/config.ini')
 default_config = config['DEFAULT']
 
-MSG_BUF_LEN = default_config['MSG_BUF_LEN']
-FIX_HEADER_LEN = default_config['FIX_HEADER_LEN']
-print(MSG_BUF_LEN)
-print(FIX_HEADER_LEN)
+MSG_BUF_LEN = int(default_config['MSG_BUF_LEN'])
+FIX_HEADER_LEN = int(default_config['FIX_HEADER_LEN'])
 
 
 def encrypt_payload(payload, seckey):
@@ -39,7 +37,7 @@ def create_msg(msg_type_str, payload):
     """
     le_str = str(len(payload))
     fixed_le_str = le_str + (20 - len(le_str))*' '
-    header_str = le_str + msg_type_str[:4]
+    header_str = fixed_le_str + msg_type_str[:4]
     fixed_header_str = header_str + (FIX_HEADER_LEN - len(header_str))*' '
 
     header = fixed_header_str.encode('utf-8')
