@@ -2,16 +2,22 @@
 
 from collections import namedtuple, defaultdict
 from pickle import dumps, loads
-from random import choice
-from time import time
+from random import choice, random
+from time import time, sleep
 from itertools import zip_longest
 from functools import reduce
+from queue import Queue
+import threading
+from copy import deepcopy
+import hashlib
 
 from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
                       crypto_sign_detached, crypto_sign_verify_detached,
                       crypto_generichash)
 
 from model.utils import bfs, toposort, randrange
+
+import sys, signal
 
 
 C = 6
@@ -27,7 +33,7 @@ def majority(it):
         return True, hits[1]
 
 
-Event = namedtuple('Event', 'd p t c s')
+Event = namedtuple('Event', 'd p t c s') # data, parent hashes, event timestamp, creator ID(pubkey), signature
 class Trilean:
     false = 0
     true = 1
@@ -35,7 +41,9 @@ class Trilean:
 
 
 class Node:
-    def __init__(self, kp, network, n_nodes, stake):
+    def __init__(self, kp, network, n_nodes, stake, balance):
+        self.lock = threading.Lock()
+
         self.pk, self.sk = kp
         self.network = network  # {pk -> Node.ask_sync} dict
         self.n = n_nodes
@@ -43,6 +51,10 @@ class Node:
         self.tot_stake = sum(stake.values())
         self.min_s = 2 * self.tot_stake / 3  # min stake amount
 
+        # {member-pk => int(balance value)}
+        self.balance = deepcopy(balance)
+
+        self.flg = False # CHANGED: for debug
 
         # {event-hash => event}: this is the hash graph
         self.hg = {}
@@ -54,12 +66,19 @@ class Node:
         self.tbd = set()
         # [event-hash]: final order of the transactions
         self.transactions = []
+        # {event-hash => index of the event in the final transactions list}
         self.idx = {}
         # {round-num}: rounds where famousness is fully decided
         self.consensus = set()
+        # CHANGED: {event-hash => consensus-timestamp}: consensus timestamp of the event
+        self.consensusts = {}
+        # CHANGED: {event-hash => consensus-time}: system time that the event reached consensus
+        self.consensusat = {}
+        # CHANGED: [consensus-time]: list of system time that events reached consensus
+        self.consensusats = []
         # {event-hash => {event-hash => bool}}
         self.votes = defaultdict(dict)
-        # {round-num => {member-pk => event-hash}}: 
+        # {round-num => {member-pk => event-hash}}:
         self.witnesses = defaultdict(dict)
         self.famous = {}
 
@@ -70,6 +89,11 @@ class Node:
         # and for each member m the latest event from m having same round
         # number as ev that ev can see
         self.can_see = {}
+
+        # transactions to be included in next event
+        self.new_tx_list = []
+        # transactions transferred to here and added to the event
+        self.tx_list_to_be_sent = []
 
         # init first local event
         h, ev = self.new_event(None, ())
@@ -279,6 +303,7 @@ class Node:
 
     def find_order(self, new_c):
         to_int = lambda x: int.from_bytes(self.hg[x].s, byteorder='big')
+        finals = []
 
         for r in sorted(new_c):
             f_w = {w for w in self.witnesses[r].values() if self.famous[w]}
@@ -306,10 +331,65 @@ class Node:
             final = sorted(seen, key=lambda x: (ts[x], white ^ to_int(x)))
             for i, x in enumerate(final):
                 self.idx[x] = i + len(self.transactions)
+                self.consensusats.append(time()) # CHANGED: system time of the consensus of that event
+                self.consensusts[x] = ts[x] # add if need to keep and call with hash later
+                self.consensusat[x] = time() # add if need to keep and call with hash later
             self.transactions += final
+            finals += final
         if self.consensus:
-            print(self.consensus)
+            # print(self.consensus)
+            pass
+        return finals
 
+
+    def execute_transactions(self, finals):
+        for x in finals:
+            ev = self.hg[x]
+            d = ev.d
+            if not d:
+                continue
+            for tx in d:
+                if tx['type'] == 'send':
+                    result = 'ok'
+                    amount = tx['amount']
+                    sender = tx['sender']
+                    receiver = tx['receiver']
+                    if amount > 0 and self.balance[sender] >= amount:
+                        self.balance[sender] -= amount
+                        self.balance[receiver] += amount
+                    else:
+                        result = 'ng'
+
+
+    def loop1(self, lock):
+        for i in range(100):
+            # sleep(0.01)
+            r = random()
+            if r < 0.05:
+                c = tuple(self.network.keys() - {self.pk})[randrange(self.n - 1)]
+                d = {
+                    "type": "send",
+                    "sender": self.pk,
+                    "receiver": c,
+                    "amount": randrange(100)
+                }
+                with lock:
+                    self.new_tx_list.append(d)
+
+
+    def loop2(self, lock):
+        for i in range(100):
+            # sleep(0.01)
+            r = random()
+            if r < 0.01:
+                with lock:
+                    self.tx_list_to_be_sent = deepcopy(self.new_tx_list)
+                    self.new_tx_list = []
+                return
+        with lock:
+            self.tx_list_to_be_sent = deepcopy(self.new_tx_list)
+            self.new_tx_list = []
+        return
 
 
     def main(self):
@@ -317,9 +397,19 @@ class Node:
 
         new = ()
         while True:
-            print('a: '+str(self.pk))
-            payload = (yield new)
-            print('b: '+str(self.pk))
+            yield new
+            if len(self.transactions) < 500:
+                self.t1 = threading.Thread(target=self.loop1, args=(self.lock, ))
+                self.t2 = threading.Thread(target=self.loop2, args=(self.lock, ))
+                # print('==Thread Started==')
+                self.t1.start()
+                self.t2.start()
+                self.t1.join()
+                self.t2.join()
+                # print('==Thread Ended==')
+            else:
+                self.tx_list_to_be_sent = []
+            payload = deepcopy(self.tx_list_to_be_sent)
 
             # pick a random node to sync with but not me
             c = tuple(self.network.keys() - {self.pk})[randrange(self.n - 1)]
@@ -327,14 +417,16 @@ class Node:
             self.divide_rounds(new)
 
             new_c = self.decide_fame()
-            self.find_order(new_c)
+            finals = self.find_order(new_c)
+            self.execute_transactions(finals)
 
 
 def test(n_nodes, n_turns):
     kps = [crypto_sign_keypair() for _ in range(n_nodes)]
     network = {}
     stake = {kp[0]: 1 for kp in kps}
-    nodes = [Node(kp, network, n_nodes, stake) for kp in kps]
+    balance = {kp[0]: 1000 for kp in kps}
+    nodes = [Node(kp, network, n_nodes, stake, balance) for kp in kps]
     for n in nodes:
         network[n.pk] = n.ask_sync
     mains = [n.main() for n in nodes]
@@ -342,10 +434,8 @@ def test(n_nodes, n_turns):
         next(m)
     for i in range(n_turns):
         r = randrange(n_nodes)
-        print('working node: %i, event number: %i' % (r, i))
+        # print('working node: %i, event number: %i' % (r, i))
         next(mains[r])
     return nodes
 
-
-if __name__ == "__main__":
-    test(3, 10)
+nodes = test(4, 1000)
