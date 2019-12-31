@@ -23,6 +23,11 @@ import sys, signal
 C = 6
 
 
+def transform_info_to_tuple(info):
+    info_tuple = ()
+    return info_tuple
+
+
 def majority(it):
     hits = [0, 0]
     for s, x in it:
@@ -419,6 +424,10 @@ class Node:
             new_c = self.decide_fame()
             finals = self.find_order(new_c)
             self.execute_transactions(finals)
+    
+
+    def test_c(self):
+        print(C)
 
 
 def test(n_nodes, n_turns):
@@ -438,4 +447,6 @@ def test(n_nodes, n_turns):
         next(mains[r])
     return nodes
 
-nodes = test(4, 1000)
+
+if __name__ == '__main__':
+    nodes = test(4, 1000)

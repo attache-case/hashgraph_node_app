@@ -3,6 +3,7 @@ from pysodium import crypto_sign_keypair
 from node_functions import receiver
 from node_functions import sender
 from node_functions.utils import outbound_query
+from model import node
 
 EC2_MANAGER_ELASTIC_IP = '52.199.141.89'
 EC2_MANAGER_PORT = 50007
@@ -27,3 +28,7 @@ if __name__ == "__main__":
     sender.send_init_info(info, EC2_MANAGER_ELASTIC_IP, EC2_MANAGER_PORT)
     info = receiver.receive_tell_msg()
     print(info)
+
+    info_tuple = node.transform_info_to_tuple(info)
+    n = node.Node(*info_tuple)
+    n.test_c()
