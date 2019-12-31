@@ -11,7 +11,7 @@ from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
                       crypto_sign_detached, crypto_sign_verify_detached,
                       crypto_generichash)
 
-from utils import bfs, toposort, randrange
+from model.utils import bfs, toposort, randrange
 
 
 C = 6
