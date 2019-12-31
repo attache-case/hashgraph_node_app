@@ -33,6 +33,7 @@ def receive_tell_msg(listen_ip='0.0.0.0', listen_port=50008):
                 received_all_client_info = True
                 conn.sendall(b'OK: Received your TELL.')
             else:
+                info = {}
                 conn.sendall(b'NG: Only receiving your TELL now.')
             # TELLを受信し処理が終わったら、待ち受けをやめる
             if received_all_client_info is True:
