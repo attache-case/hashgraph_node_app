@@ -1,10 +1,13 @@
 from pysodium import crypto_sign_keypair
+import traceback
 
 from node_functions import receiver
 from node_functions import sender
 from node_functions import p2p_setup
 from node_functions.utils import outbound_query
+from node_functions.utils import logger
 from model import node
+
 
 EC2_MANAGER_ELASTIC_IP = '52.199.141.89'
 EC2_MANAGER_PORT = 50007
@@ -23,15 +26,23 @@ node_pks = None
 
 
 if __name__ == "__main__":
-    my_info = {}
-    my_info['pk'] = my_pk
-    my_info['pub_ip'] = pub_ip
-    sender.send_init_info(my_info, EC2_MANAGER_ELASTIC_IP, EC2_MANAGER_PORT)
-    info = receiver.receive_tell_msg()
-    print(info)
+    try:
+        logger.info('sample start.')
 
-    setup_result, new_info = p2p_setup.p2p_setup_main(my_info, info)
+        my_info = {}
+        my_info['pk'] = my_pk
+        my_info['pub_ip'] = pub_ip
+        sender.send_init_info(my_info, EC2_MANAGER_ELASTIC_IP, EC2_MANAGER_PORT)
+        info = receiver.receive_tell_msg()
+        print(info)
 
-    info_tuple = node.transform_info_to_tuple(my_kp, new_info)
-    n = node.Node(*info_tuple)
-    n.test_c()
+        setup_result, new_info = p2p_setup.p2p_setup_main(my_info, info)
+
+        info_tuple = node.transform_info_to_tuple(my_kp, new_info)
+        n = node.Node(*info_tuple)
+        n.test_c()
+
+        logger.info('sample end.')
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        logger.error(e)
