@@ -34,7 +34,10 @@ def try_init(my_info, info, dest_port=50008):
     """
     send_status = 'A'
     fail_count = 0
-    n_nodes = info['n_nodes']
+    n_nodes = info['n_nodes'] - 1
+    for addr in list(set(info['nodes']) - {my_info['pub_ip']}):
+        send_queue.put(addr)
+    
     while True:
         next_queue = queue.Queue()
         while send_queue.empty() is False:
@@ -53,6 +56,7 @@ def try_init(my_info, info, dest_port=50008):
                         sendable_ips.append(addr)
             except:
                 next_queue.put(addr)
+                fail_count += 1
         if next_queue.empty():
             break
         elif fail_count < N//3:
@@ -76,7 +80,7 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50008):
         info: dict of objects
             他のノードと通信を開始するのに必要な情報
     """
-    n_nodes = info['n_nodes']
+    n_nodes = info['n_nodes'] - 1
     receive_status = 'A'
     t_listen_start_sec = time()
 
@@ -85,21 +89,27 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50008):
         # FWやセキュリティポリシーで解放されているIP/Portにするべきである
         s.bind((listen_ip, listen_port))
         # 接続待ち受け
+        s.settimeout(20)
         s.listen(10)
 
         # connectionするまで待つ
         while True:
-            # 接続
-            conn, addr = s.accept()
-            header, payload = msg_processor.recv_msg(conn)
-            msg_type = msg_parser.parse_msg_sub_header(header)['msg_type']
-            if msg_type == 'INIT':
-                pub_ip, pk = msg_parser.parse_init_msg(payload)
-                conn.sendall(b'OK: Received your INIT info.')
-                new_addr2pub_ip[addr] = pub_ip
-                receive_set.add(pub_ip)
-            else:
-                conn.sendall(b'NG: Only receiving your INIT info now.')
+            try:
+                # 接続
+                conn, addr = s.accept()
+                header, payload = msg_processor.recv_msg(conn)
+                msg_type = msg_parser.parse_msg_sub_header(header)['msg_type']
+                if msg_type == 'INIT':
+                    pub_ip, pk = msg_parser.parse_init_msg(payload)
+                    conn.sendall(b'OK: Received your INIT info.')
+                    new_addr2pub_ip[addr[0]] = pub_ip
+                    receive_set.add(pub_ip)
+                else:
+                    conn.sendall(b'NG: Only receiving your INIT info now.')
+            except socket.timeout:
+                pass
+            except:
+                raise
 
             if len(receive_set) == n_nodes:
                 break
