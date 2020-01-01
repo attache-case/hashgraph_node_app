@@ -37,6 +37,8 @@ if __name__ == "__main__":
         print(info)
 
         setup_result, new_info = p2p_setup.p2p_setup_main(my_info, info)
+        print(setup_result)
+        print(new_info)
 
         info_tuple = node.transform_info_to_tuple(my_kp, new_info)
         n = node.Node(*info_tuple)

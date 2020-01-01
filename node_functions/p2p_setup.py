@@ -44,6 +44,7 @@ def try_init(my_info, info, dest_port=50010):
             addr = send_queue.get()
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(3)
                     s.connect((addr, dest_port))
 
                     # サーバにメッセージを送る
@@ -54,7 +55,7 @@ def try_init(my_info, info, dest_port=50010):
                     data = s.recv(msg_processor.MSG_BUF_LEN)
                     if data:
                         sendable_ips.append(addr)
-            except ConnectionRefusedError:
+            except (ConnectionRefusedError, TimeoutError):
                 next_queue.put(addr)
                 fail_count += 1
             except:
