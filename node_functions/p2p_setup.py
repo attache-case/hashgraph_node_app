@@ -54,9 +54,11 @@ def try_init(my_info, info, dest_port=50008):
                     data = s.recv(msg_processor.MSG_BUF_LEN)
                     if data:
                         sendable_ips.append(addr)
-            except:
+            except ConnectionRefusedError:
                 next_queue.put(addr)
                 fail_count += 1
+            except:
+                raise
         if next_queue.empty():
             break
         elif fail_count < N//3:
