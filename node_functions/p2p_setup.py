@@ -39,6 +39,9 @@ def try_init(my_info, info, dest_port=50010):
     n_nodes = info['n_nodes'] - 1
     for addr in list(set(info['nodes']) - {my_info['pub_ip']}):
         send_queue.put(addr)
+
+    print('[initial send_queue]')
+    print(list(set(info['nodes']) - {my_info['pub_ip']}))
     
     while True:
         next_queue = queue.Queue()
@@ -47,7 +50,9 @@ def try_init(my_info, info, dest_port=50010):
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.settimeout(3)
+                    print('trying to connect: ' + addr + ', ' + str(dest_port))
                     s.connect((addr, dest_port))
+                    print('connected to: ' + addr + ', ' + str(dest_port))
 
                     # サーバにメッセージを送る
                     msg_tuple = msg_composer.compose_init_msg(my_info)
@@ -57,7 +62,8 @@ def try_init(my_info, info, dest_port=50010):
                     data = s.recv(msg_processor.MSG_BUF_LEN)
                     if data:
                         sendable_ips.append(addr)
-            except (ConnectionRefusedError, TimeoutError, socket.timeout):
+            except (ConnectionRefusedError, TimeoutError, socket.timeout) as e:
+                print(e)
                 next_queue.put(addr)
                 fail_count += 1
             except:
@@ -76,6 +82,7 @@ def try_init(my_info, info, dest_port=50010):
             send_status = 'C'
             break
     
+    print('send_status: ' + send_status)
     return
 
 
@@ -104,7 +111,9 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
         while True:
             try:
                 # 接続
+                print('listening at: ' + listen_ip + ', ' + str(listen_port))
                 conn, addr = s.accept()
+                print('got connection from: ' + addr[0] + ', ' + str(addr[1]))
                 header, payload = msg_processor.recv_msg(conn)
                 msg_type = msg_parser.parse_msg_sub_header(header)['msg_type']
                 if msg_type == 'INIT':
@@ -115,6 +124,7 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
                 else:
                     conn.sendall(b'NG: Only receiving your INIT info now.')
             except socket.timeout:
+                print('listen timeout')
                 pass
             except:
                 receive_status = 'Z'
@@ -137,6 +147,7 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
     for addr in receive_set:
         receivable_ips.append(addr)
     
+    print('receive_status: ' + receive_status)
     return
 
 
