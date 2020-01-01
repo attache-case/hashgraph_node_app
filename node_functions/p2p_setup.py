@@ -157,7 +157,7 @@ def p2p_setup_main(my_info, info):
     new_addr2pub_ip = info['addr2pub_ip']
 
     t_try_init = threading.Thread(target=try_init, args=(my_info, info))
-    t_listen_init = threading.Thread(target=listen_init, args=(my_info, info, my_info['pub_ip']))
+    t_listen_init = threading.Thread(target=listen_init, args=(my_info, info))
     # print('==Thread Started==')
     t_try_init.start()
     t_listen_init.start()
