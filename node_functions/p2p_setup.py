@@ -28,7 +28,7 @@ new_addr2pub_ip = {}
 # info['node_pks'] = node_pks
 
 
-def try_init(my_info, info, dest_port=50008):
+def try_init(my_info, info, dest_port=50010):
     """
     他のノードに自身の情報をINITで伝え導通確認をする
     """
@@ -61,11 +61,11 @@ def try_init(my_info, info, dest_port=50008):
                 raise
         if next_queue.empty():
             break
-        elif fail_count < N//3:
+        elif fail_count < n_nodes//3:
             while next_queue.empty() is False:
                 send_queue.put(next_queue.get())
             continue
-        elif next_queue.qsize() < N//10:
+        elif next_queue.qsize() < n_nodes//10:
             send_status = 'B'
             break
         else:
@@ -75,7 +75,7 @@ def try_init(my_info, info, dest_port=50008):
     return
 
 
-def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50008):
+def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
     """
     他のノードからINITが来るのを待ち、受信する
     Returns:
@@ -120,7 +120,7 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50008):
                 t_listen_elapsed_sec = t_listen_current_sec - t_listen_start_sec
                 if t_listen_elapsed_sec < 100:
                     continue
-                elif len(receive_set) > 9*N//10:
+                elif len(receive_set) > 9*n_nodes//10:
                     receive_status = 'B'
                     break
                 else:
