@@ -32,6 +32,8 @@ def try_init(my_info, info, dest_port=50010):
     """
     他のノードに自身の情報をINITで伝え導通確認をする
     """
+    global send_status
+
     send_status = 'A'
     fail_count = 0
     n_nodes = info['n_nodes'] - 1
@@ -55,10 +57,11 @@ def try_init(my_info, info, dest_port=50010):
                     data = s.recv(msg_processor.MSG_BUF_LEN)
                     if data:
                         sendable_ips.append(addr)
-            except (ConnectionRefusedError, TimeoutError):
+            except (ConnectionRefusedError, TimeoutError, socket.timeout):
                 next_queue.put(addr)
                 fail_count += 1
             except:
+                send_status = 'Z'
                 raise
         if next_queue.empty():
             break
@@ -83,6 +86,8 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
         info: dict of objects
             他のノードと通信を開始するのに必要な情報
     """
+    global receive_status
+
     n_nodes = info['n_nodes'] - 1
     receive_status = 'A'
     t_listen_start_sec = time()
@@ -112,6 +117,7 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
             except socket.timeout:
                 pass
             except:
+                receive_status = 'Z'
                 raise
 
             if len(receive_set) == n_nodes:
