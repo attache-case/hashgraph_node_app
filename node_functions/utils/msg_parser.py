@@ -12,9 +12,10 @@ def parse_msg_sub_header(msg_sub_header_str):
     return parse_result
 
 
-# def parse_init_msg(payload):
-#     d = load_object(payload)
-#     return d['pub_ip'], d['pk']
+def parse_init_msg(payload):
+    d = load_object(payload)
+    return d['pub_ip'], d['pk']
+
 
 def parse_tell_msg(payload):
     d = load_object(payload)

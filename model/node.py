@@ -23,8 +23,20 @@ import sys, signal
 C = 6
 
 
-def transform_info_to_tuple(info):
-    info_tuple = ()
+def transform_info_to_tuple(my_kp, info):
+    pks = info['nodes']
+    pks.append(my_kp[0])
+    # TBD: now, network should be ips or pks of nodes
+    network = {}
+    stake = {pk: 0 for pk in pks}
+    balance = {pk: 1000 for pk in pks}
+    info_tuple = (
+        my_kp,
+        network,
+        info['n_nodes'],
+        stake,
+        balance
+    )
     return info_tuple
 
 
