@@ -155,34 +155,34 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
     return
 
 
-async def process(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    print("awaiting for data")
-    line = await reader.readline()
-    print(f"received {line}")
-    writer.write(line)
-    print(f"sent {line}")
-    await writer.drain()
-    print(f"Drained")
+# async def process(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+#     print("awaiting for data")
+#     line = await reader.readline()
+#     print(f"received {line}")
+#     writer.write(line)
+#     print(f"sent {line}")
+#     await writer.drain()
+#     print(f"Drained")
 
 
-async def new_session(reader, writer):
-    print("new session started")
-    try:
-        await asyncio.wait_for(process(reader, writer), timeout=5)
-    except asyncio.TimeoutError as te:
-        print(f'time is up!{te}')
-    finally:
-        writer.close()
-        print("writer closed")
+# async def new_session(reader, writer):
+#     print("new session started")
+#     try:
+#         await asyncio.wait_for(process(reader, writer), timeout=5)
+#     except asyncio.TimeoutError as te:
+#         print(f'time is up!{te}')
+#     finally:
+#         writer.close()
+#         print("writer closed")
 
 
-async def a_main():
-    server = await asyncio.start_server(new_session, port=50010)
-    await server.serve_forever()
+# async def a_main():
+#     server = await asyncio.start_server(new_session, port=50010)
+#     await server.serve_forever()
 
 
-if __name__ == '__main__':
-    asyncio.run(a_main())
+# if __name__ == '__main__':
+#     asyncio.run(a_main())
 
 
 def p2p_setup_main(my_info, info):
