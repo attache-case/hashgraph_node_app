@@ -6,9 +6,14 @@ from time import time
 import queue
 # from tqdm import tqdm
 
-from node_functions.utils import msg_composer
-from node_functions.utils import msg_processor
-from node_functions.utils import msg_parser
+try:
+    from node_functions.utils import msg_composer
+    from node_functions.utils import msg_processor
+    from node_functions.utils import msg_parser
+except ModuleNotFoundError:
+    from utils import msg_composer
+    from utils import msg_processor
+    from utils import msg_parser
 
 
 send_queue = queue.Queue()
