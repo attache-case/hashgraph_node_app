@@ -8,7 +8,16 @@ import socket
 
 
 config = configparser.ConfigParser()
-config.read('/home/ec2-user/hashgraph_node_app/node_functions/utils/config.ini')
+try:
+    config.read('/home/ec2-user/hashgraph_node_app/node_functions/utils/config.ini')
+    assert(int(config['DEFAULT']['MSG_BUF_LEN'])>0)
+except:
+    try:
+        config = configparser.ConfigParser()
+        config.read('./node_functions/utils/config.ini')
+        assert(int(config['DEFAULT']['MSG_BUF_LEN'])>0)
+    except:
+        raise
 default_config = config['DEFAULT']
 
 MSG_BUF_LEN = int(default_config['MSG_BUF_LEN'])

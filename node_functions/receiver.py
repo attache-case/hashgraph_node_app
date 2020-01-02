@@ -13,7 +13,7 @@ def receive_tell_msg(listen_ip='0.0.0.0', listen_port=50008):
         info: dict of objects
             他のノードと通信を開始するのに必要な情報
     """
-    # 
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         # IPアドレスとポートを指定してbindする
         # FWやセキュリティポリシーで解放されているIP/Portにするべきである
@@ -38,5 +38,5 @@ def receive_tell_msg(listen_ip='0.0.0.0', listen_port=50008):
             # TELLを受信し処理が終わったら、待ち受けをやめる
             if received_all_client_info is True:
                 break
-            
+
     return info

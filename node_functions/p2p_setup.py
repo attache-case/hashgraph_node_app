@@ -155,54 +155,57 @@ def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
     return
 
 
-# async def process(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-#     print("awaiting for data")
-#     line = await reader.readline()
-#     print(f"received {line}")
-#     writer.write(line)
-#     print(f"sent {line}")
-#     await writer.drain()
-#     print(f"Drained")
+async def process(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    print("awaiting for data")
+    line = await reader.readline()
+    print(f"received {line}")
+    writer.write(line)
+    print(f"sent {line}")
+    await writer.drain()
+    print(f"Drained")
 
 
-# async def new_session(reader, writer):
-#     print("new session started")
-#     try:
-#         await asyncio.wait_for(process(reader, writer), timeout=5)
-#     except asyncio.TimeoutError as te:
-#         print(f'time is up!{te}')
-#     finally:
-#         writer.close()
-#         print("writer closed")
+async def new_session(reader, writer):
+    print("new session started")
+    try:
+        await asyncio.wait_for(process(reader, writer), timeout=5)
+    except asyncio.TimeoutError as te:
+        print(f'time is up!{te}')
+    finally:
+        writer.close()
+        print("writer closed")
 
 
-# async def a_main():
-#     server = await asyncio.start_server(new_session, port=50010)
-#     await server.serve_forever()
+async def a_main():
+    server = await asyncio.start_server(new_session, port=50010)
+    await server.serve_forever()
 
 
-# if __name__ == '__main__':
-#     asyncio.run(a_main())
+if __name__ == '__main__':
+    asyncio.run(a_main())
 
 
 def p2p_setup_main(my_info, info):
-    result_tuple = (None, None)
-    new_info = {}
-    new_addr2pub_ip = info['addr2pub_ip']
+    try:
+        result_tuple = (None, None)
+        new_info = {}
+        new_addr2pub_ip = info['addr2pub_ip']
 
-    t_try_init = threading.Thread(target=try_init, args=(my_info, info))
-    t_listen_init = threading.Thread(target=listen_init, args=(my_info, info))
-    # print('==Thread Started==')
-    t_try_init.start()
-    t_listen_init.start()
-    t_try_init.join()
-    t_listen_init.join()
+        t_try_init = threading.Thread(target=try_init, args=(my_info, info))
+        t_listen_init = threading.Thread(target=listen_init, args=(my_info, info))
+        # print('==Thread Started==')
+        t_try_init.start()
+        t_listen_init.start()
+        t_try_init.join()
+        t_listen_init.join()
 
-    result_tuple = (send_status, receive_status)
+        result_tuple = (send_status, receive_status)
 
-    new_info['n_nodes'] = info['n_nodes']
-    new_info['nodes'] = list(set(sendable_ips)&set(receivable_ips))
-    new_info['addr2pub_ip'] = new_addr2pub_ip
-    new_info['node_pks'] = info['node_pks']
+        new_info['n_nodes'] = info['n_nodes']
+        new_info['nodes'] = list(set(sendable_ips)&set(receivable_ips))
+        new_info['addr2pub_ip'] = new_addr2pub_ip
+        new_info['node_pks'] = info['node_pks']
+    except:
+        raise
 
     return result_tuple, new_info
