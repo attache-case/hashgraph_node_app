@@ -64,17 +64,16 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
         writer.write(message)
     else:
         writer.write(message.encode())
+    writer.write_eof()
 
-    full_data = b''
-    while True:
-        data = await reader.read(10)  # 512
-        if data == b'': # if b'\x04'(Ctrl-D) is sent, can detect this maybe.
-            print('read EOF')
-            break
-        else:
-            print('read 10 bytes')
-            full_data += data
-    # full_data = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
+    # full_data = b''
+    # while True:
+    #     data = await reader.read(512)  # 512
+    #     if data == b'': # if b'\x04'(Ctrl-D) is sent, can detect this maybe.
+    #         break
+    #     else:
+    #         full_data += data
+    full_data = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
     msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(full_data)
     msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
     print(f'Received: {msg_type}::{full_payload}')  # if needed -> data.decode()
@@ -115,7 +114,6 @@ async def recv_send(loop, sock):
         data = await loop.sock_recv(sock, 512)
         if data == b'':
             print('[FD:{}]Recv:EOF'.format(sock.fileno()))
-            await loop.sock_sendall(sock, b'')
             sock.close()
             break
 
