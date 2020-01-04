@@ -123,7 +123,7 @@ def p2p_setup_main(my_info, info):
         result_tuple = (None, None)
         new_info = {}
         new_addr2pub_ip = info['addr2pub_ip']
-        addrs = info['nodes']
+        addrs = set(info['nodes']) - {my_info['pub_ip']}
         msg_init = msg_processor.create_msg(
             *msg_composer.compose_init_msg(my_info)
         )
