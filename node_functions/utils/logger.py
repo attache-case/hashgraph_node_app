@@ -2,7 +2,7 @@ import datetime
 import watchtower, logging
 import boto3
 
-session = boto3.Session(region_name='ap-northeast-1')
+session = boto3.Session()
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger('sample_logger')
