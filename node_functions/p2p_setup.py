@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import asyncio
+from random import random
 import socket
 import threading
 from time import time
@@ -35,182 +36,156 @@ new_addr2pub_ip = {}
 # info['node_pks'] = node_pks
 
 
-def try_init(my_info, info, dest_port=50010):
-    """
-    他のノードに自身の情報をINITで伝え導通確認をする
-    """
-    global send_status
+"""
+Client Side
+"""
 
-    send_status = 'A'
-    fail_count = 0
-    n_nodes = info['n_nodes'] - 1
-    for addr in list(set(info['nodes']) - {my_info['pub_ip']}):
-        send_queue.put(addr)
+async def tcp_echo_client(message, addr, port, loop, encoded=True):
+    retry_cnt = 0
+    while retry_cnt < 10:
+        try:
+            reader, writer = \
+                await asyncio.open_connection(addr, port,
+                                              loop=loop)
+        except:
+            r = random() * 3
+            print(f'open_coneection({addr}:{port}) failed. sleep {r} sec.')
+            await asyncio.sleep(r)
+            retry_cnt += 1
+    if retry_cnt >= 10:
+        print(f'open_coneection({addr}:{port}) retry exceeded.')
+        return
 
-    print('[initial send_queue]')
-    print(list(set(info['nodes']) - {my_info['pub_ip']}))
+    print('Send: %r' % message)
+    if encoded:
+        writer.write(message)
+    else:
+        writer.write(message.encode())
+
+    data = await reader.read(-1)
+    print('Received: %r' % data.decode())
+    # msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(data)
+    # msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
+
+    print('Close the socket')
+    writer.close()
+
+
+"""
+Server Side
+"""
+
+def create_server_socket(port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setblocking(False)
+    sock.bind(('', port))
+    sock.listen(256)
+    print('Server Run Port:{}'.format(port))
+    return sock
+
+
+async def accept(loop, sock):
+    print('Ready For Accept')
 
     while True:
-        next_queue = queue.Queue()
-        while send_queue.empty() is False:
-            addr = send_queue.get()
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(3)
-                    s.setblocking(False)
-                    print('trying to connect: ' + addr + ', ' + str(dest_port))
-                    s.connect((addr, dest_port))
-                    print('connected to: ' + addr + ', ' + str(dest_port))
+        new_socket, (remote_host, remote_remport) = await loop.sock_accept(sock)
+        new_socket.setblocking(False)
+        print('[FD:{}]Accept:{}:{}'.format(new_socket.fileno(), remote_host, remote_remport))
+        asyncio.ensure_future(recv_send(loop, new_socket))
 
-                    # サーバにメッセージを送る
-                    msg_tuple = msg_composer.compose_init_msg(my_info)
-                    s.sendall(msg_processor.create_msg(*msg_tuple))
 
-                    # サーバからの文字列を取得する。
-                    data = s.recv(msg_processor.MSG_BUF_LEN)
-                    if data:
-                        sendable_ips.append(addr)
-            except (ConnectionRefusedError, TimeoutError, socket.timeout) as e:
-                print(e)
-                next_queue.put(addr)
-                fail_count += 1
-            except:
-                send_status = 'Z'
-                raise
-        if next_queue.empty():
-            break
-        elif fail_count < n_nodes//3:
-            while next_queue.empty() is False:
-                send_queue.put(next_queue.get())
-            continue
-        elif next_queue.qsize() < n_nodes//10:
-            send_status = 'B'
-            break
-        else:
-            send_status = 'C'
+async def recv_send(loop, sock):
+    remote_host, remote_remport = sock.getpeername()
+    print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
+
+    while True:
+        data = await loop.sock_recv(sock, 512)
+        if data == b'':
+            print('[FD:{}]Recv:EOF'.format(sock.fileno()))
+            sock.close()
             break
 
-    print('send_status: ' + send_status)
-    return
+        print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
+        await loop.sock_sendall(sock, data)
+
+"""
+Loops
+"""
 
 
-def listen_init(my_info ,info ,listen_ip='0.0.0.0', listen_port=50010):
-    """
-    他のノードからINITが来るのを待ち、受信する
-    Returns:
-        info: dict of objects
-            他のノードと通信を開始するのに必要な情報
-    """
-    global receive_status
-
-    n_nodes = info['n_nodes'] - 1
-    receive_status = 'A'
-    t_listen_start_sec = time()
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        # IPアドレスとポートを指定してbindする
-        # FWやセキュリティポリシーで解放されているIP/Portにするべきである
-        s.bind((listen_ip, listen_port))
-        # 接続待ち受け
-        s.settimeout(20)
-        s.listen(10)
-        s.setblocking(False)
-
-        # connectionするまで待つ
-        while True:
-            try:
-                # 接続
-                print('listening at: ' + listen_ip + ', ' + str(listen_port))
-                conn, addr = s.accept()
-                print('got connection from: ' + addr[0] + ', ' + str(addr[1]))
-                header, payload = msg_processor.recv_msg(conn)
-                msg_type = msg_parser.parse_msg_sub_header(header)['msg_type']
-                if msg_type == 'INIT':
-                    pub_ip, pk = msg_parser.parse_init_msg(payload)
-                    conn.sendall(b'OK: Received your INIT info.')
-                    new_addr2pub_ip[addr[0]] = pub_ip
-                    receive_set.add(pub_ip)
-                else:
-                    conn.sendall(b'NG: Only receiving your INIT info now.')
-            except socket.timeout:
-                print('listen timeout')
-                pass
-            except:
-                receive_status = 'Z'
-                raise
-
-            if len(receive_set) == n_nodes:
-                break
-            else:
-                t_listen_current_sec = time()
-                t_listen_elapsed_sec = t_listen_current_sec - t_listen_start_sec
-                if t_listen_elapsed_sec < 100:
-                    continue
-                elif len(receive_set) > 9*n_nodes//10:
-                    receive_status = 'B'
-                    break
-                else:
-                    receive_status = 'C'
-                    break
-
-    for addr in receive_set:
-        receivable_ips.append(addr)
-
-    print('receive_status: ' + receive_status)
-    return
-
-
-async def process(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    print("awaiting for data")
-    line = await reader.readline()
-    print(f"received {line}")
-    writer.write(line)
-    print(f"sent {line}")
-    await writer.drain()
-    print(f"Drained")
-
-
-async def new_session(reader, writer):
-    print("new session started")
-    try:
-        await asyncio.wait_for(process(reader, writer), timeout=5)
-    except asyncio.TimeoutError as te:
-        print(f'time is up!{te}')
-    finally:
-        writer.close()
-        print("writer closed")
-
-
-async def a_main():
-    server = await asyncio.start_server(new_session, port=50010)
-    await server.serve_forever()
-
-
-if __name__ == '__main__':
-    asyncio.run(a_main())
-
+"""
+Main Function
+"""
 
 def p2p_setup_main(my_info, info):
     try:
         result_tuple = (None, None)
         new_info = {}
         new_addr2pub_ip = info['addr2pub_ip']
+        addrs = info['nodes']
+        msg_init = msg_processor.create_msg(
+            *msg_composer.compose_init_msg(my_info)
+        )
 
-        t_try_init = threading.Thread(target=try_init, args=(my_info, info))
-        t_listen_init = threading.Thread(target=listen_init, args=(my_info, info))
-        # print('==Thread Started==')
-        t_try_init.start()
-        t_listen_init.start()
-        t_try_init.join()
-        t_listen_init.join()
-
-        result_tuple = (send_status, receive_status)
-
-        new_info['n_nodes'] = info['n_nodes']
-        new_info['nodes'] = list(set(sendable_ips)&set(receivable_ips))
-        new_info['addr2pub_ip'] = new_addr2pub_ip
-        new_info['node_pks'] = info['node_pks']
     except:
         raise
 
+    event_loop = asyncio.SelectorEventLoop()
+    asyncio.set_event_loop(event_loop)
+    server_sock = create_server_socket(50010)
+
+    gather_list = [
+        accept(event_loop, server_sock)
+    ]
+    for addr in addrs:
+        gather_list.append(tcp_echo_client(msg_init, addr, 50010, event_loop))
+    gather_tuple = tuple(gather_list)
+    try:
+        event_loop.run_until_complete(
+            asyncio.gather(
+                *gather_tuple
+                # accept(event_loop, server_sock),
+                # tcp_echo_client('test', 7778, event_loop)
+            )
+        )
+    except KeyboardInterrupt:
+        event_loop.close()
+        server_sock.close()
+    
+    result_tuple = (send_status, receive_status)
+
+    new_info['n_nodes'] = info['n_nodes']
+    new_info['nodes'] = list(set(sendable_ips)&set(receivable_ips))
+    new_info['addr2pub_ip'] = new_addr2pub_ip
+    new_info['node_pks'] = info['node_pks']
+    
     return result_tuple, new_info
+
+
+"""
+Main
+"""
+
+if __name__ == '__main__':
+    event_loop = asyncio.SelectorEventLoop()
+    asyncio.set_event_loop(event_loop)
+    server_sock = create_server_socket(7777)
+
+    gather_list = [
+        accept(event_loop, server_sock)
+    ]
+    for port in range(7778, 7783):
+        gather_list.append(tcp_echo_client(f'test{port}', port, event_loop))
+    gather_tuple = tuple(gather_list)
+    try:
+        event_loop.run_until_complete(
+            asyncio.gather(
+                *gather_tuple
+                # accept(event_loop, server_sock),
+                # tcp_echo_client('test', 7778, event_loop)
+            )
+        )
+    except KeyboardInterrupt:
+        event_loop.close()
+        server_sock.close()

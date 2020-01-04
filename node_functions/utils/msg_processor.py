@@ -78,7 +78,7 @@ def recv_msg(conn):
             return None, None
         if new_msg:
             msg_header = data[:FIX_HEADER_LEN]
-            msg_header_str= msg_header.decode('utf-8')
+            msg_header_str = msg_header.decode('utf-8')
             payload_len = int(msg_header_str[:20])
             msg_sub_header_str = msg_header_str[20:]
             new_msg = False
@@ -88,6 +88,22 @@ def recv_msg(conn):
         
         if len(full_payload) == payload_len:
             return msg_sub_header_str, full_payload
+
+
+def split_fully_rcvd_msg(data):
+    """
+    Split full message with header to usable tuple
+
+    Returns:
+        msg_sub_header_str: string
+        full_payload: bytes
+    """
+    full_payload = b''
+    msg_header = data[:FIX_HEADER_LEN]
+    msg_header_str = msg_header.decode('utf-8')
+    msg_sub_header_str = msg_header_str[:20]
+    full_payload += data[FIX_HEADER_LEN:]
+    return msg_sub_header_str, full_payload
 
 
 def create_encrypted_msg(msg_type_str, payload, sk):
