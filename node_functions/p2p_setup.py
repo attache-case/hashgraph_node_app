@@ -67,10 +67,12 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
 
     full_data = b''
     while True:
-        data = await reader.read(512)
+        data = await reader.read(10)  # 512
         if data == b'': # if b'\x04'(Ctrl-D) is sent, can detect this maybe.
+            print('read EOF')
             break
         else:
+            print('read 10 bytes')
             full_data += data
     # full_data = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
     msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(full_data)
