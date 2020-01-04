@@ -7,7 +7,7 @@ from time import time
 import queue
 # from tqdm import tqdm
 
-BYTE_EOF = b'\x04'
+# BYTE_EOF = b'\x04'
 
 try:
     from node_functions.utils import msg_composer
@@ -65,14 +65,14 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
     else:
         writer.write(message.encode())
 
-    # full_data = b''
-    # while True:
-    #     data = await reader.read(512)
-    #     if data == b'': # if b'\x04'(Ctrl-D) is sent, can detect this maybe.
-    #         break
-    #     else:
-    #         full_data += data
-    full_data = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
+    full_data = b''
+    while True:
+        data = await reader.read(512)
+        if data == b'': # if b'\x04'(Ctrl-D) is sent, can detect this maybe.
+            break
+        else:
+            full_data += data
+    # full_data = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
     msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(full_data)
     msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
     print(f'Received: {msg_type}::{full_payload}')  # if needed -> data.decode()
@@ -113,12 +113,13 @@ async def recv_send(loop, sock):
         data = await loop.sock_recv(sock, 512)
         if data == b'':
             print('[FD:{}]Recv:EOF'.format(sock.fileno()))
+            await loop.sock_sendall(sock, b'')
             sock.close()
             break
 
         print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
         # await loop.sock_sendall(sock, data)
-        await loop.sock_sendall(sock, data+BYTE_EOF)
+        await loop.sock_sendall(sock, data)
 
 """
 Loops
