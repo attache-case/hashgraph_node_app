@@ -75,11 +75,11 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
 Server Side
 """
 
-def create_server_socket(port):
+def create_server_socket(addr, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setblocking(False)
-    sock.bind(('', port))
+    sock.bind((addr, port))
     sock.listen(256)
     print('Server Run Port:{}'.format(port))
     return sock
@@ -133,7 +133,7 @@ def p2p_setup_main(my_info, info):
 
     event_loop = asyncio.SelectorEventLoop()
     asyncio.set_event_loop(event_loop)
-    server_sock = create_server_socket(50010)
+    server_sock = create_server_socket('0.0.0.0', 50010)
 
     gather_list = [
         accept(event_loop, server_sock)
