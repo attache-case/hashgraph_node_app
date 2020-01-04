@@ -39,6 +39,15 @@ new_addr2pub_ip = {}
 
 
 """
+Original Error
+"""
+
+class P2PSetupTimeUpError(Exception):
+    """P2Pの導通確認の時間切れを知らせる例外クラス"""
+    pass
+
+
+"""
 Client Side
 """
 
@@ -76,10 +85,11 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
     full_data = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
     msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(full_data)
     msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
-    print(f'Received: {msg_type}::{full_payload}')  # if needed -> data.decode()
+    print(f'Received: {full_data}')  # if needed -> data.decode()
 
     print('Close the socket')
     writer.close()
+    sendable_ips.append(addr)
 
 
 """
@@ -103,27 +113,42 @@ async def accept(loop, sock):
         new_socket, (remote_host, remote_remport) = await loop.sock_accept(sock)
         new_socket.setblocking(False)
         print('[FD:{}]Accept:{}:{}'.format(new_socket.fileno(), remote_host, remote_remport))
-        asyncio.ensure_future(recv_send(loop, new_socket))
+        asyncio.ensure_future(recv_send(loop, new_socket, remote_host, remote_remport))
 
 
-async def recv_send(loop, sock):
+async def recv_send(loop, sock, remote_host, remote_remport):
     remote_host, remote_remport = sock.getpeername()
     print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
 
+    full_data = b''
     while True:
         data = await loop.sock_recv(sock, 512)
         if data == b'':
             print('[FD:{}]Recv:EOF'.format(sock.fileno()))
+            msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(full_data)
+            msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
+            if msg_type == 'INIT':
+                msg_ret = b'OK: received your INIT.'
+                pub_ip, pk = msg_parser.parse_init_msg(full_payload)
+                new_addr2pub_ip[remote_host] = pub_ip
+                receivable_ips.append(pub_ip)
+            else:
+                msg_ret = b'NG: your message was not INIT.'
+            await loop.sock_sendall(sock, msg_ret)
             sock.close()
             break
 
         print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
+        full_data += data
         # await loop.sock_sendall(sock, data)
-        await loop.sock_sendall(sock, data)
 
 """
 Loops
 """
+
+async def p2p_setup_timer(t_limit, loop):
+    await asyncio.sleep(t_limit)
+    raise P2PSetupTimeUpError()
 
 
 """
@@ -150,7 +175,8 @@ def p2p_setup_main(my_info, info):
     server_sock = create_server_socket('0.0.0.0', 50010)
 
     gather_list = [
-        accept(event_loop, server_sock)
+        accept(event_loop, server_sock),
+        p2p_setup_timer(60, event_loop)
     ]
     for addr in addrs:
         gather_list.append(tcp_echo_client(msg_init, addr, 50010, event_loop))
@@ -163,9 +189,22 @@ def p2p_setup_main(my_info, info):
                 # tcp_echo_client('test', 7778, event_loop)
             )
         )
+    except P2PSetupTimeUpError:
+        event_loop.close()
+        server_sock.close()
     except KeyboardInterrupt:
         event_loop.close()
         server_sock.close()
+    
+    if len(sendable_ips) == (info['n_nodes'] - 1):
+        send_status = 'A'
+    else:
+        send_status = 'B'
+    
+    if len(receivable_ips) == (info['n_nodes'] - 1):
+        receive_status = 'A'
+    else:
+        receive_status = 'B'
     
     result_tuple = (send_status, receive_status)
 
