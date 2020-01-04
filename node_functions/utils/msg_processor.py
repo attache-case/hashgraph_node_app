@@ -101,7 +101,7 @@ def split_fully_rcvd_msg(data):
     full_payload = b''
     msg_header = data[:FIX_HEADER_LEN]
     msg_header_str = msg_header.decode('utf-8')
-    msg_sub_header_str = msg_header_str[:20]
+    msg_sub_header_str = msg_header_str[20:]
     full_payload += data[FIX_HEADER_LEN:]
     return msg_sub_header_str, full_payload
 
