@@ -64,9 +64,9 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
         writer.write(message.encode())
 
     data = await reader.read(-1)
-    print('Received: %r' % data.decode())
-    # msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(data)
-    # msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
+    msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(data)
+    msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
+    print(f'Received: {msg_type}::{full_payload}')  # if needed -> data.decode()
 
     print('Close the socket')
     writer.close()
@@ -173,7 +173,7 @@ Main
 if __name__ == '__main__':
     event_loop = asyncio.SelectorEventLoop()
     asyncio.set_event_loop(event_loop)
-    server_sock = create_server_socket(7777)
+    server_sock = create_server_socket('', 7777)
 
     gather_list = [
         accept(event_loop, server_sock)
