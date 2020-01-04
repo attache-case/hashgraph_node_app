@@ -47,6 +47,7 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
             reader, writer = \
                 await asyncio.open_connection(addr, port,
                                               loop=loop)
+            break
         except:
             r = random() * 3
             print(f'open_coneection({addr}:{port}) failed. sleep {r} sec.')
@@ -123,10 +124,12 @@ def p2p_setup_main(my_info, info):
         result_tuple = (None, None)
         new_info = {}
         new_addr2pub_ip = info['addr2pub_ip']
-        addrs = set(info['nodes']) - {my_info['pub_ip']}
+        addrs = list(set(info['nodes']) - {my_info['pub_ip']})
         msg_init = msg_processor.create_msg(
             *msg_composer.compose_init_msg(my_info)
         )
+        print('INIT message to send:')
+        print(msg_init)
 
     except:
         raise
