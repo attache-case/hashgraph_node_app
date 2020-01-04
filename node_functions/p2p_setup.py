@@ -63,8 +63,14 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
     else:
         writer.write(message.encode())
 
-    data = await reader.read(-1)
-    msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(data)
+    full_data = b''
+    while True:
+        data = await reader.read(512)
+        if data == b'': # if b'\x04'(Ctrl-D) is sent, can detect this maybe.
+            break
+        else:
+            full_data += data
+    msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(full_data)
     msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
     print(f'Received: {msg_type}::{full_payload}')  # if needed -> data.decode()
 
