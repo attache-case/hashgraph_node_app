@@ -645,7 +645,7 @@ class Node:
         for x in self.transactions:
             finality = self.consensusat[x] - self.hg[x].t
             finality_sec.append(finality)
-        print(finality_sec)
+        # print(finality_sec)
 
         log_info = {
             'n_nodes': self.n,
@@ -665,7 +665,7 @@ class Node:
         t_now = int(time())
         import pickle
         fname = f'{t_now}.binaryfile'
-        with open(fname, 'wb') as f:
+        with open(f'./logs/{fname}', 'wb') as f:
             pickle.dump(log_info, f)
         print(f'log binaryfile created: {fname}')
     
