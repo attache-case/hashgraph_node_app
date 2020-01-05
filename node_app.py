@@ -40,11 +40,14 @@ if __name__ == "__main__":
 
         setup_result, new_info = p2p_setup.p2p_setup_main(my_info, info)
         print(setup_result)
-        print(new_info)
+        # print(new_info)
 
         info_tuple = node.transform_info_to_tuple(my_kp, new_info)
+        print('Create node')
         n = node.Node(*info_tuple)
-        n.main_asyncio(0.5)
+        print('Start Hashgraph.')
+        n.main_asyncio()
+        print('End hashgraph.')
         # n.test_c()
 
         if is_monitor_node:

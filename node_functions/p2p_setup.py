@@ -215,6 +215,7 @@ def p2p_setup_main(my_info, info):
     new_info['node_pks'] = info['node_pks']
     new_info['shard_belong'] = info['shard_belong']
     new_info['n_shards'] = info['n_shards']
+    new_info['interval_s'] = info['interval_s']
     
     return result_tuple, new_info
 

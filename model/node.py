@@ -80,7 +80,7 @@ def transform_info_to_tuple(my_kp, info):
         info['n_nodes'],
         stake,
         balance,
-        0.1  # sync_freq_s
+        info['interval_s']
     )
     return info_tuple
 
@@ -107,10 +107,10 @@ class Node:
                  network, r_network,
                  shard_ip_belong, shard_pk_belong,
                  n_nodes, stake,
-                 balance, sync_freq_s):
+                 balance, interval_s):
         self.lock = threading.Lock()
 
-        self.sync_freq_s = sync_freq_s
+        self.interval_s = interval_s
 
         self.pk, self.sk = kp
         self.n_shards = n_shards
@@ -459,13 +459,13 @@ class Node:
         self.tx_list_to_be_sent = deepcopy(self.new_tx_list)
         self.new_tx_list = []
 
-    async def sync_loop(self, loop, interval_s):
+    async def sync_loop(self, loop):
         """Update hg and return new event ids in topological order."""
 
         while True:
             t1 = time()
             t_prep_1 = time()
-            if len(self.transactions) < 500:
+            if len(self.transactions) < 500*TX_LIMIT_PER_NODE:
                 self.randomly_add_tx_to_new_tx_list(0.1)
                 self.read_out_new_tx_list_to_tx_list_to_be_sent()
             else:
@@ -488,9 +488,9 @@ class Node:
                 reader, writer = \
                     await asyncio.open_connection(self.network[c], 50020,
                                                   loop=loop)
-                print(f'open_coneection({self.network[c]}:{50020}) OK.')
+                # print(f'open_coneection({self.network[c]}:{50020}) OK.')
             except:
-                print(f'open_coneection({self.network[c]}:{50020}) NG.')
+                # print(f'open_coneection({self.network[c]}:{50020}) NG.')
                 continue
             
             # print('Send: %r' % info)
@@ -539,15 +539,14 @@ class Node:
             
             t2 = time()
             t_elapsed = t2 - t1
-            if t_elapsed < interval_s:
-                await asyncio.sleep(interval_s - t_elapsed)
+            if t_elapsed < self.interval_s:
+                await asyncio.sleep(self.interval_s - t_elapsed)
             self.log_sync_all_time.append(t2-t1)
             self.log_sync_prep_process_time.append(t_prep_2-t_prep_1)
             self.log_nw_io_time.append(t_nw_2-t_nw_1)
             self.log_sync_post_process_time.append(t_post_2-t_post_1)
             self.log_nw_out_bytes.append(sys.getsizeof(info))
             self.log_nw_in_bytes.append(sys.getsizeof(msg))
-            # self.log_ask_sync_process_time()
 
         raise ENDHashgraph()
 
@@ -581,7 +580,7 @@ class Node:
                             if self.hg[p].c not in cs or self.height[p] > cs[self.hg[p].c]))}
                 msg = dumps((self.head, subset))
                 msg_ret = crypto_sign(msg, self.sk)
-                print(f'Return subset of length: {len(subset)}')
+                # print(f'Return subset of length: {len(subset)}')
                 await loop.sock_sendall(sock, msg_ret)
                 sock.close()
                 break
@@ -592,7 +591,7 @@ class Node:
         self.log_ask_sync_process_time.append(t2-t1)
 
     
-    def main_asyncio(self, interval_s):
+    def main_asyncio(self):
         event_loop = asyncio.SelectorEventLoop()
         asyncio.set_event_loop(event_loop)
         server_sock = create_server_socket('0.0.0.0', 50020)
@@ -602,7 +601,7 @@ class Node:
         ]
         # for shard_id in range(self.n_shards):
         #     gather_list.append(tcp_echo_client(msg_init, addr, 50010, event_loop))
-        gather_list.append(self.sync_loop(event_loop, interval_s))
+        gather_list.append(self.sync_loop(event_loop))
         gather_tuple = tuple(gather_list)
         try:
             event_loop.run_until_complete(
@@ -626,7 +625,7 @@ class Node:
         log_info = {
             'n_nodes': self.n,
             'n_shards': self.n_shards,
-            'interval_s': interval_s,
+            'interval_s': self.interval_s,
             'len_txs': len(self.transactions),
             'log_sync_all_time': self.log_sync_all_time,
             'log_sync_prep_process_time': self.log_sync_prep_process_time,
