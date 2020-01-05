@@ -443,10 +443,12 @@ class Node:
         self.tx_list_to_be_sent = deepcopy(self.new_tx_list)
         self.new_tx_list = []
 
-    async def sync_loop(self, loop):
+    async def sync_loop(self, loop, interval_s):
         """Update hg and return new event ids in topological order."""
 
         while True:
+            print(f'len(txs): {len(self.transactions)}')
+            t1 = time()
             if len(self.transactions) < 500:
                 self.randomly_add_tx_to_new_tx_list(0.1)
                 self.read_out_new_tx_list_to_tx_list_to_be_sent()
@@ -467,7 +469,9 @@ class Node:
                 reader, writer = \
                     await asyncio.open_connection(self.network[c], 50020,
                                                   loop=loop)
+                print(f'open_coneection({self.network[c]}:{50020}) OK.')
             except:
+                print(f'open_coneection({self.network[c]}:{50020}) NG.')
                 continue
             
             # print('Send: %r' % info)
@@ -475,7 +479,7 @@ class Node:
             writer.write_eof()
 
             ret_info = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
-            print(f'Received: {ret_info}')  # if needed -> data.decode()
+            # print(f'Received: {ret_info}')  # if needed -> data.decode()
 
             # print('Close the socket')
             writer.close()
@@ -507,6 +511,12 @@ class Node:
             new_c = self.decide_fame()
             finals = self.find_order(new_c)
             self.execute_transactions(finals)
+            
+            t2 = time()
+            t_elapsed = t2 - t1
+            if t_elapsed < interval_s:
+                await asyncio.sleep(interval_s - t_elapsed)
+
         raise ENDHashgraph()
 
 
@@ -546,7 +556,7 @@ class Node:
             full_data += data
 
     
-    def main_asyncio(self):
+    def main_asyncio(self, interval_s):
         event_loop = asyncio.SelectorEventLoop()
         asyncio.set_event_loop(event_loop)
         server_sock = create_server_socket('0.0.0.0', 50020)
@@ -556,7 +566,7 @@ class Node:
         ]
         # for shard_id in range(self.n_shards):
         #     gather_list.append(tcp_echo_client(msg_init, addr, 50010, event_loop))
-        gather_list.append(self.sync_loop(event_loop))
+        gather_list.append(self.sync_loop(event_loop, interval_s))
         gather_tuple = tuple(gather_list)
         try:
             event_loop.run_until_complete(
