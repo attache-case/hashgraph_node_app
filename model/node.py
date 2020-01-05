@@ -26,7 +26,8 @@ C = 6
 def transform_info_to_tuple(my_kp, info):
     pub_ips = info['nodes']
     pk_dict = info['node_pks']
-    shard_belong = info['shard_belong']
+    shard_ip_belong = info['shard_belong']
+    shard_pk_belong = {pk_dict[ip]:shard_ip_belong[ip] for ip in pub_ips}
     pks = [pk_dict[pub_ip] for pub_ip in pub_ips]
     # pk2pubip = {pk: pub_ip for pub_ip, pk in pk_dict.items()}
     # TBD: now, network should be ips or pks of nodes
@@ -35,7 +36,10 @@ def transform_info_to_tuple(my_kp, info):
     balance = {pk: 1000 for pk in pks}
     info_tuple = (
         my_kp,
+        info['n_shards'],
         network,
+        shard_ip_belong,
+        shard_pk_belong,
         info['n_nodes'],
         stake,
         balance,
@@ -62,14 +66,19 @@ class Trilean:
 
 
 class Node:
-    def __init__(self, kp, network, n_nodes, stake, balance, sync_freq_s):
+    def __init__(self, kp, n_shards,
+                 network, shard_ip_belong,
+                 shard_pk_belong, n_nodes, stake,
+                 balance, sync_freq_s):
         self.lock = threading.Lock()
 
         self.pk, self.sk = kp
+        self.n_shards = n_shards
+        self.my_shard_id = shard_pk_belong[self.pk]
         self.network = network  # {pk -> Node.ask_sync} dict
-        self.n = n_nodes
-        self.stake = stake
-        self.tot_stake = sum(stake.values())
+        self.n = n_nodes  # have to be according to shard
+        self.stake = stake  # have to be according to shard
+        self.tot_stake = sum(stake.values())  # have to be according to shard
         self.min_s = 2 * self.tot_stake / 3  # min stake amount
 
         # {member-pk => int(balance value)}
