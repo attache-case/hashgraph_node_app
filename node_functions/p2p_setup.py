@@ -91,6 +91,7 @@ async def tcp_echo_client(message, addr, port, loop,
     # print('Close the socket')
     writer.close()
     sendable_ips.append(addr)
+    print(f'Sendable nodes: {len(sendable_ips)}')
 
 
 """
@@ -133,6 +134,7 @@ async def recv_send(loop, sock, remote_host, remote_remport):
                 pub_ip, pk = msg_parser.parse_init_msg(full_payload)
                 new_addr2pub_ip[remote_host] = pub_ip
                 receivable_ips.append(pub_ip)
+                print(f'Receivable nodes: {len(receivable_ips)}')
             else:
                 msg_ret = b'NG: your message was not INIT.'
             await loop.sock_sendall(sock, msg_ret)

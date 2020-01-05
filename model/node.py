@@ -466,7 +466,9 @@ class Node:
         print(f'run until {n_txs_to_be_reached} TXs reach consensus.')
         print(f'sync interval is set to {self.interval_s}')
         tx_done_percent = 0
+        conn_fail_count = 0
         while True:
+            conn_fail_count = 0
             t1 = time()
             t_prep_1 = time()
             if len(self.transactions) < n_txs_to_be_reached:
@@ -494,18 +496,28 @@ class Node:
                                                   loop=loop)
                 # print(f'open_coneection({self.network[c]}:{50020}) OK.')
             except:
+                conn_fail_count += 1
+                if conn_fail_count > 10:
+                    await asyncio.sleep(min(0.2, conn_fail_count/100))
+                if conn_fail_count > 100:
+                    print(f'Conn fail > 100. break.')
+                    break
                 # print(f'open_coneection({self.network[c]}:{50020}) NG.')
                 continue
             
-            # print('Send: %r' % info)
-            writer.write(info)
-            writer.write_eof()
+            try:
+                # print('Send: %r' % info)
+                writer.write(info)
+                writer.write_eof()
 
-            ret_info = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
-            # print(f'Received: {ret_info}')  # if needed -> data.decode()
+                ret_info = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
+                # print(f'Received: {ret_info}')  # if needed -> data.decode()
 
-            # print('Close the socket')
-            writer.close()
+                # print('Close the socket')
+                writer.close()
+            except Exception as e:
+                print(e)
+                continue
 
             t_nw_2 = time()
             t_post_1 = time()
@@ -571,32 +583,35 @@ class Node:
             asyncio.ensure_future(self.recv_send(loop, new_socket, remote_host, remote_remport))
 
     async def recv_send(self, loop, sock, remote_host, remote_remport):
-        remote_host, remote_remport = sock.getpeername()
-        # print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
+        try:
+            remote_host, remote_remport = sock.getpeername()
+            # print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
 
-        t1 = time()
-        full_data = b''
-        while True:
-            data = await loop.sock_recv(sock, 512)
-            if data == b'':
-                # print('[FD:{}]Recv:EOF'.format(sock.fileno()))
-                cs = loads(crypto_sign_open(full_data, self.r_network[remote_host]))
+            t1 = time()
+            full_data = b''
+            while True:
+                data = await loop.sock_recv(sock, 512)
+                if data == b'':
+                    # print('[FD:{}]Recv:EOF'.format(sock.fileno()))
+                    cs = loads(crypto_sign_open(full_data, self.r_network[remote_host]))
 
-                subset = {h: self.hg[h] for h in bfs(
-                    (self.head,),
-                    lambda u: (p for p in self.hg[u].p
-                            if self.hg[p].c not in cs or self.height[p] > cs[self.hg[p].c]))}
-                msg = dumps((self.head, subset))
-                msg_ret = crypto_sign(msg, self.sk)
-                # print(f'Return subset of length: {len(subset)}')
-                await loop.sock_sendall(sock, msg_ret)
-                sock.close()
-                break
+                    subset = {h: self.hg[h] for h in bfs(
+                        (self.head,),
+                        lambda u: (p for p in self.hg[u].p
+                                if self.hg[p].c not in cs or self.height[p] > cs[self.hg[p].c]))}
+                    msg = dumps((self.head, subset))
+                    msg_ret = crypto_sign(msg, self.sk)
+                    # print(f'Return subset of length: {len(subset)}')
+                    await loop.sock_sendall(sock, msg_ret)
+                    sock.close()
+                    break
 
-            # print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
-            full_data += data
-        t2 = time()
-        self.log_ask_sync_process_time.append(t2-t1)
+                # print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
+                full_data += data
+            t2 = time()
+            self.log_ask_sync_process_time.append(t2-t1)
+        except:
+            print(f'Exception while recv_send()')
 
     
     def main_asyncio(self):
@@ -647,8 +662,10 @@ class Node:
 
         t_now = int(time())
         import pickle
-        with open(f'{t_now}.binaryfile', 'wb') as f:
+        fname = f'{t_now}.binaryfile'
+        with open(fname, 'wb') as f:
             pickle.dump(log_info, f)
+        print(f'log binaryfile created: {fname}')
     
 
     def test_c(self):
