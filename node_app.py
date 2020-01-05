@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
         info_tuple = node.transform_info_to_tuple(my_kp, new_info)
         n = node.Node(*info_tuple)
-        n.test_c()
+        # n.test_c()
 
         logger.info('sample end.')
     except Exception as e:

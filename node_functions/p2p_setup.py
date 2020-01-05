@@ -51,9 +51,10 @@ class P2PSetupTimeUpError(Exception):
 Client Side
 """
 
-async def tcp_echo_client(message, addr, port, loop, encoded=True):
+async def tcp_echo_client(message, addr, port, loop,
+                          encoded=True, max_retry=10):
     retry_cnt = 0
-    while retry_cnt < 10:
+    while retry_cnt < max_retry:
         try:
             reader, writer = \
                 await asyncio.open_connection(addr, port,
@@ -64,7 +65,7 @@ async def tcp_echo_client(message, addr, port, loop, encoded=True):
             print(f'open_coneection({addr}:{port}) failed. sleep {r} sec.')
             await asyncio.sleep(r)
             retry_cnt += 1
-    if retry_cnt >= 10:
+    if retry_cnt >= max_retry:
         print(f'open_coneection({addr}:{port}) retry exceeded.')
         return
 
@@ -209,7 +210,7 @@ def p2p_setup_main(my_info, info):
     result_tuple = (send_status, receive_status)
 
     new_info['n_nodes'] = info['n_nodes']
-    new_info['nodes'] = list(set(sendable_ips)&set(receivable_ips))
+    new_info['nodes'] = list(set(sendable_ips)&set(receivable_ips)|{my_info['pub_ip']})
     new_info['addr2pub_ip'] = new_addr2pub_ip
     new_info['node_pks'] = info['node_pks']
     

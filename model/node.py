@@ -29,7 +29,7 @@ def transform_info_to_tuple(my_kp, info):
     pks = [pk_dict[pub_ip] for pub_ip in pub_ips]
     # pk2pubip = {pk: pub_ip for pub_ip, pk in pk_dict.items()}
     # TBD: now, network should be ips or pks of nodes
-    network = {}
+    network = {pk: pub_ip for pub_ip, pk in pk_dict.items()}
     stake = {pk: 0 for pk in pks}
     balance = {pk: 1000 for pk in pks}
     info_tuple = (
@@ -37,7 +37,8 @@ def transform_info_to_tuple(my_kp, info):
         network,
         info['n_nodes'],
         stake,
-        balance
+        balance,
+        0.1  # sync_freq_s
     )
     return info_tuple
 
@@ -60,7 +61,7 @@ class Trilean:
 
 
 class Node:
-    def __init__(self, kp, network, n_nodes, stake, balance):
+    def __init__(self, kp, network, n_nodes, stake, balance, sync_freq_s):
         self.lock = threading.Lock()
 
         self.pk, self.sk = kp
