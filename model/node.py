@@ -462,10 +462,14 @@ class Node:
     async def sync_loop(self, loop):
         """Update hg and return new event ids in topological order."""
 
+        n_txs_to_be_reached = self.n*TX_LIMIT_PER_NODE
+        print(f'run until {n_txs_to_be_reached} TXs reach consensus.')
+        print(f'sync interval is set to {self.interval_s}')
+        tx_done_percent = 0
         while True:
             t1 = time()
             t_prep_1 = time()
-            if len(self.transactions) < 500*TX_LIMIT_PER_NODE:
+            if len(self.transactions) < n_txs_to_be_reached:
                 self.randomly_add_tx_to_new_tx_list(0.1)
                 self.read_out_new_tx_list_to_tx_list_to_be_sent()
             else:
@@ -547,6 +551,10 @@ class Node:
             self.log_sync_post_process_time.append(t_post_2-t_post_1)
             self.log_nw_out_bytes.append(sys.getsizeof(info))
             self.log_nw_in_bytes.append(sys.getsizeof(msg))
+            l_txs = len(self.transactions)
+            if l_txs * 100 // n_txs_to_be_reached > tx_done_percent:
+                tx_done_percent = l_txs * 100 // n_txs_to_be_reached
+                print(f'TXs reached consensus: {l_txs} ... {tx_done_percent}%')
 
         raise ENDHashgraph()
 

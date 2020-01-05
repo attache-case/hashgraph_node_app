@@ -69,7 +69,7 @@ async def tcp_echo_client(message, addr, port, loop,
         print(f'open_coneection({addr}:{port}) retry exceeded.')
         return
 
-    print('Send: %r' % message)
+    # print('Send: %r' % message)
     if encoded:
         writer.write(message)
     else:
@@ -86,9 +86,9 @@ async def tcp_echo_client(message, addr, port, loop,
     full_data = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
     msg_sub_header_str, full_payload = msg_processor.split_fully_rcvd_msg(full_data)
     msg_type = msg_parser.parse_msg_sub_header(msg_sub_header_str)['msg_type']
-    print(f'Received: {full_data}')  # if needed -> data.decode()
+    # print(f'Received: {full_data}')  # if needed -> data.decode()
 
-    print('Close the socket')
+    # print('Close the socket')
     writer.close()
     sendable_ips.append(addr)
 
@@ -139,7 +139,7 @@ async def recv_send(loop, sock, remote_host, remote_remport):
             sock.close()
             break
 
-        print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
+        # print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
         full_data += data
         # await loop.sock_sendall(sock, data)
 
@@ -165,8 +165,8 @@ def p2p_setup_main(my_info, info):
         msg_init = msg_processor.create_msg(
             *msg_composer.compose_init_msg(my_info)
         )
-        print('INIT message to send:')
-        print(msg_init)
+        # print('INIT message to send:')
+        # print(msg_init)
 
     except:
         raise
