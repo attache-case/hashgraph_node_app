@@ -112,17 +112,17 @@ def create_server_socket(addr, port):
     return sock
 
 
-async def accept(loop, sock, n_nodes_to_recv):
+async def accept(loop, sock):
     print('Ready For Accept')
 
     while True:
         new_socket, (remote_host, remote_remport) = await loop.sock_accept(sock)
         new_socket.setblocking(False)
         print('[FD:{}]Accept:{}:{}'.format(new_socket.fileno(), remote_host, remote_remport))
-        asyncio.ensure_future(recv_send(loop, new_socket, remote_host, remote_remport, n_nodes_to_recv))
+        asyncio.ensure_future(recv_send(loop, new_socket, remote_host, remote_remport))
 
 
-async def recv_send(loop, sock, remote_host, remote_remport, n_nodes_to_recv):
+async def recv_send(loop, sock, remote_host, remote_remport):
     remote_host, remote_remport = sock.getpeername()
     print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
 
@@ -147,17 +147,19 @@ async def recv_send(loop, sock, remote_host, remote_remport, n_nodes_to_recv):
         # print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
         full_data += data
         # await loop.sock_sendall(sock, data)
-    
-    print(f'Receivable nodes: {len(receivable_ips)}')
-    if len(receivable_ips) >= n_nodes_to_recv:
-        raise P2PReceivedAll()
 
 """
 Loops
 """
 
-async def p2p_setup_timer(t_limit, loop):
-    await asyncio.sleep(t_limit)
+async def p2p_setup_timer(t_limit, n_nodes_to_recv, loop):
+    cnt = 0
+    while cnt < t_limit:
+        await asyncio.sleep(1)
+        print(f'Receivable nodes: {len(receivable_ips)}')
+        if len(receivable_ips) >= n_nodes_to_recv:
+            raise P2PReceivedAll()
+        cnt += 1
     raise P2PSetupTimeUpError()
 
 
@@ -186,8 +188,8 @@ def p2p_setup_main(my_info, info):
     server_sock = create_server_socket('0.0.0.0', 50010)
 
     gather_list = [
-        accept(event_loop, server_sock, n_nodes_to_recv),
-        p2p_setup_timer(60, event_loop)
+        accept(event_loop, server_sock),
+        p2p_setup_timer(60, n_nodes_to_recv, event_loop)
     ]
     for addr in addrs:
         gather_list.append(tcp_echo_client(msg_init, addr, 50010, event_loop))
