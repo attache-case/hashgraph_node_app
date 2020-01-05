@@ -449,7 +449,7 @@ class Node:
         while True:
             print(f'len(hg): {len(self.hg)}, len(txs): {len(self.transactions)}')
             if len(self.hg) > 30:
-                print({h:(tuple([p[:8] for p in ev.p]), ev.c[:8], int(ev.t)%10000) for h, ev in self.hg.items()})
+                print({h[:8]:(tuple([p[:8] for p in ev.p]), ev.c[:8], int(ev.t)%10000) for h, ev in self.hg.items()})
                 break
             t1 = time()
             if len(self.transactions) < 500:
