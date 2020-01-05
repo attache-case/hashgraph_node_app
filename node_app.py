@@ -24,10 +24,12 @@ nodes = None
 addr2pub_ip = None
 node_pks = None
 
+is_monitor_node = False
 
 if __name__ == "__main__":
     try:
-        logger.info('sample start.')
+        if is_monitor_node:
+            logger.info('sample start.')
 
         my_info = {}
         my_info['pk'] = my_pk
@@ -44,7 +46,10 @@ if __name__ == "__main__":
         n = node.Node(*info_tuple)
         # n.test_c()
 
-        logger.info('sample end.')
+        if is_monitor_node:
+            logger.info('sample end.')
     except Exception as e:
-        logger.error(traceback.format_exc())
-        logger.error(e)
+        if is_monitor_node:
+            logger.error(traceback.format_exc())
+            logger.error(e)
+        print(e)
