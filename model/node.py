@@ -568,6 +568,8 @@ class Node:
                 tx_done_percent = l_txs * 100 // n_txs_to_be_reached
                 print(f'TXs reached consensus: {l_txs} ... {tx_done_percent}%')
 
+        print(f'wait 60 secs to shutdown')
+        await asyncio.sleep(60)
         raise ENDHashgraph()
 
 

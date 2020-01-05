@@ -36,9 +36,12 @@ if __name__ == "__main__":
         my_info['pub_ip'] = pub_ip
         sender.send_init_info(my_info, EC2_MANAGER_ELASTIC_IP, EC2_MANAGER_PORT)
         info = receiver.receive_tell_msg()
-        print(info)
+        print(f'received TELL.')
+        # print(info)
+        print(f'start setting up p2p')
 
         setup_result, new_info = p2p_setup.p2p_setup_main(my_info, info)
+        print(f'end setting up p2p')
         print(setup_result)
         # print(new_info)
 

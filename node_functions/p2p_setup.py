@@ -46,6 +46,10 @@ class P2PSetupTimeUpError(Exception):
     """P2Pの導通確認の時間切れを知らせる例外クラス"""
     pass
 
+class P2PReceivedAll(Exception):
+    """P2Pの導通確認の終了を知らせる例外クラス"""
+    pass
+
 
 """
 Client Side
@@ -108,17 +112,17 @@ def create_server_socket(addr, port):
     return sock
 
 
-async def accept(loop, sock):
+async def accept(loop, sock, n_nodes_to_recv):
     print('Ready For Accept')
 
     while True:
         new_socket, (remote_host, remote_remport) = await loop.sock_accept(sock)
         new_socket.setblocking(False)
         print('[FD:{}]Accept:{}:{}'.format(new_socket.fileno(), remote_host, remote_remport))
-        asyncio.ensure_future(recv_send(loop, new_socket, remote_host, remote_remport))
+        asyncio.ensure_future(recv_send(loop, new_socket, remote_host, remote_remport, n_nodes_to_recv))
 
 
-async def recv_send(loop, sock, remote_host, remote_remport):
+async def recv_send(loop, sock, remote_host, remote_remport, n_nodes_to_recv):
     remote_host, remote_remport = sock.getpeername()
     print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
 
@@ -134,7 +138,6 @@ async def recv_send(loop, sock, remote_host, remote_remport):
                 pub_ip, pk = msg_parser.parse_init_msg(full_payload)
                 new_addr2pub_ip[remote_host] = pub_ip
                 receivable_ips.append(pub_ip)
-                print(f'Receivable nodes: {len(receivable_ips)}')
             else:
                 msg_ret = b'NG: your message was not INIT.'
             await loop.sock_sendall(sock, msg_ret)
@@ -144,6 +147,10 @@ async def recv_send(loop, sock, remote_host, remote_remport):
         # print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
         full_data += data
         # await loop.sock_sendall(sock, data)
+    
+    print(f'Receivable nodes: {len(receivable_ips)}')
+    if len(receivable_ips) >= n_nodes_to_recv:
+        raise P2PReceivedAll()
 
 """
 Loops
@@ -167,6 +174,7 @@ def p2p_setup_main(my_info, info):
         msg_init = msg_processor.create_msg(
             *msg_composer.compose_init_msg(my_info)
         )
+        n_nodes_to_recv = info['n_nodes'] - 1
         # print('INIT message to send:')
         # print(msg_init)
 
@@ -178,7 +186,7 @@ def p2p_setup_main(my_info, info):
     server_sock = create_server_socket('0.0.0.0', 50010)
 
     gather_list = [
-        accept(event_loop, server_sock),
+        accept(event_loop, server_sock, n_nodes_to_recv),
         p2p_setup_timer(60, event_loop)
     ]
     for addr in addrs:
@@ -193,6 +201,10 @@ def p2p_setup_main(my_info, info):
             )
         )
     except P2PSetupTimeUpError:
+        event_loop.close()
+        server_sock.close()
+    except P2PReceivedAll:
+        print(f'received from all nodes. end setup.')
         event_loop.close()
         server_sock.close()
     except KeyboardInterrupt:
