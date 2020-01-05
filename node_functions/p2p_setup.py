@@ -213,6 +213,7 @@ def p2p_setup_main(my_info, info):
     new_info['nodes'] = list(set(sendable_ips)&set(receivable_ips)|{my_info['pub_ip']})
     new_info['addr2pub_ip'] = new_addr2pub_ip
     new_info['node_pks'] = info['node_pks']
+    new_info['shard_belong'] = info['shard_belong']
     
     return result_tuple, new_info
 
