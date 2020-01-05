@@ -65,7 +65,7 @@ def transform_info_to_tuple(my_kp, info):
     # pk2pubip = {pk: pub_ip for pub_ip, pk in pk_dict.items()}
     # TBD: now, network should be ips or pks of nodes
     network = {pk: pub_ip for pub_ip, pk in pk_dict.items()}
-    stake = {pk: 0 for pk in pks}
+    stake = {pk: 1 for pk in pks}
     balance = {pk: 1000 for pk in pks}
     info_tuple = (
         my_kp,
