@@ -10,6 +10,7 @@ from pickle import dumps, loads
 from queue import Queue
 from random import choice, random
 import socket
+import sys
 import threading
 from time import time, sleep
 
@@ -20,6 +21,8 @@ from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
 from model.utils import bfs, toposort, randrange
 
 import sys, signal
+
+TX_LIMIT_PER_NODE = 500
 
 """
 Original Error
@@ -107,6 +110,8 @@ class Node:
                  balance, sync_freq_s):
         self.lock = threading.Lock()
 
+        self.sync_freq_s = sync_freq_s
+
         self.pk, self.sk = kp
         self.n_shards = n_shards
         self.my_shard_id = shard_pk_belong[self.pk]
@@ -116,6 +121,17 @@ class Node:
         self.stake = stake  # have to be according to shard
         self.tot_stake = sum(stake.values())  # have to be according to shard
         self.min_s = 2 * self.tot_stake / 3  # min stake amount
+
+        self.shard_ip_belong = shard_ip_belong
+        self.shard_pk_belong = shard_pk_belong
+
+        self.log_sync_prep_process_time = []
+        self.log_nw_out_bytes = []
+        self.log_nw_in_bytes = []
+        self.log_nw_io_time = []
+        self.log_ask_sync_process_time = []
+        self.log_sync_post_process_time = []
+        self.log_sync_all_time = []
 
         # {member-pk => int(balance value)}
         self.balance = deepcopy(balance)
@@ -447,11 +463,8 @@ class Node:
         """Update hg and return new event ids in topological order."""
 
         while True:
-            print(f'len(hg): {len(self.hg)}, len(txs): {len(self.transactions)}')
-            # if len(self.hg) > 30:
-            #     print({h[:8]:(tuple([p[:8] for p in ev.p]), ev.c[:8], int(ev.t)%10000) for h, ev in self.hg.items()})
-            #     break
             t1 = time()
+            t_prep_1 = time()
             if len(self.transactions) < 500:
                 self.randomly_add_tx_to_new_tx_list(0.1)
                 self.read_out_new_tx_list_to_tx_list_to_be_sent()
@@ -468,6 +481,9 @@ class Node:
             info = crypto_sign(dumps({c: self.height[h]
                     for c, h in self.can_see[self.head].items()}), self.sk)
             
+            t_prep_2 = time()
+            t_nw_1 = time()
+
             try:
                 reader, writer = \
                     await asyncio.open_connection(self.network[c], 50020,
@@ -487,6 +503,8 @@ class Node:
             # print('Close the socket')
             writer.close()
 
+            t_nw_2 = time()
+            t_post_1 = time()
             
             msg = crypto_sign_open(ret_info, c)
 
@@ -509,18 +527,27 @@ class Node:
 
             new = new + (h,)
 
-            print(f'Length of new: {len(new)}')
+            # print(f'Length of new: {len(new)}')
             
             self.divide_rounds(new)
 
             new_c = self.decide_fame()
             finals = self.find_order(new_c)
             self.execute_transactions(finals)
+
+            t_post_2 = time()
             
             t2 = time()
             t_elapsed = t2 - t1
             if t_elapsed < interval_s:
                 await asyncio.sleep(interval_s - t_elapsed)
+            self.log_sync_all_time.append(t2-t1)
+            self.log_sync_prep_process_time.append(t_prep_2-t_prep_1)
+            self.log_nw_io_time.append(t_nw_2-t_nw_1)
+            self.log_sync_post_process_time.append(t_post_2-t_post_1)
+            self.log_nw_out_bytes.append(sys.getsizeof(info))
+            self.log_nw_in_bytes.append(sys.getsizeof(msg))
+            # self.log_ask_sync_process_time()
 
         raise ENDHashgraph()
 
@@ -540,6 +567,7 @@ class Node:
         remote_host, remote_remport = sock.getpeername()
         # print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
 
+        t1 = time()
         full_data = b''
         while True:
             data = await loop.sock_recv(sock, 512)
@@ -560,6 +588,8 @@ class Node:
 
             # print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
             full_data += data
+        t2 = time()
+        self.log_ask_sync_process_time.append(t2-t1)
 
     
     def main_asyncio(self, interval_s):
@@ -586,6 +616,32 @@ class Node:
         except KeyboardInterrupt:
             event_loop.close()
             server_sock.close()
+
+        finality_sec = []
+        for x in self.transactions:
+            finality = self.consensusat[x] - self.hg[x].t
+            finality_sec.append(finality)
+        print(finality_sec)
+
+        log_info = {
+            'n_nodes': self.n,
+            'n_shards': self.n_shards,
+            'interval_s': interval_s,
+            'len_txs': len(self.transactions),
+            'log_sync_all_time': self.log_sync_all_time,
+            'log_sync_prep_process_time': self.log_sync_prep_process_time,
+            'log_nw_io_time': self.log_nw_io_time,
+            'log_sync_post_process_time': self.log_sync_post_process_time,
+            'log_nw_out_bytes': self.log_nw_out_bytes,
+            'log_nw_in_bytes': self.log_nw_in_bytes,
+            'log_ask_sync_process_time': self.log_ask_sync_process_time,
+            'finality_sec': finality_sec
+        }
+
+        t_now = int(time())
+        import pickle
+        with open(f'{t_now}.binaryfile', 'wb') as f:
+            pickle.dump(log_info, f)
     
 
     def test_c(self):
