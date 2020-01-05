@@ -44,6 +44,7 @@ if __name__ == "__main__":
 
         info_tuple = node.transform_info_to_tuple(my_kp, new_info)
         n = node.Node(*info_tuple)
+        n.main_asyncio()
         # n.test_c()
 
         if is_monitor_node:

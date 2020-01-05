@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
 from collections import namedtuple, defaultdict
-from pickle import dumps, loads
-from random import choice, random
-from time import time, sleep
-from itertools import zip_longest
-from functools import reduce
-from queue import Queue
-import threading
 from copy import deepcopy
 import hashlib
+from itertools import zip_longest
+from functools import reduce
+from pickle import dumps, loads
+from queue import Queue
+from random import choice, random
+import socket
+import threading
+from time import time, sleep
 
 from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
                       crypto_sign_detached, crypto_sign_verify_detached,
@@ -19,6 +21,37 @@ from model.utils import bfs, toposort, randrange
 
 import sys, signal
 
+"""
+Original Error
+"""
+
+class ENDHashgraph(Exception):
+    """実験終了を知らせる例外クラス"""
+    pass
+
+
+"""
+Client Side
+"""
+
+
+"""
+Server Side
+"""
+
+def create_server_socket(addr, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setblocking(False)
+    sock.bind((addr, port))
+    sock.listen(256)
+    print('Server Run Port:{}'.format(port))
+    return sock
+
+
+"""
+Node
+"""
 
 C = 6
 
@@ -38,6 +71,7 @@ def transform_info_to_tuple(my_kp, info):
         my_kp,
         info['n_shards'],
         network,
+        pk_dict,  # r_network
         shard_ip_belong,
         shard_pk_belong,
         info['n_nodes'],
@@ -67,15 +101,17 @@ class Trilean:
 
 class Node:
     def __init__(self, kp, n_shards,
-                 network, shard_ip_belong,
-                 shard_pk_belong, n_nodes, stake,
+                 network, r_network,
+                 shard_ip_belong, shard_pk_belong,
+                 n_nodes, stake,
                  balance, sync_freq_s):
         self.lock = threading.Lock()
 
         self.pk, self.sk = kp
         self.n_shards = n_shards
         self.my_shard_id = shard_pk_belong[self.pk]
-        self.network = network  # {pk -> Node.ask_sync} dict
+        self.network = network  # {pk -> pub_ip} dict
+        self.r_network = r_network  # {pub_ip -> pk} dict
         self.n = n_nodes  # have to be according to shard
         self.stake = stake  # have to be according to shard
         self.tot_stake = sum(stake.values())  # have to be according to shard
@@ -389,66 +425,151 @@ class Node:
                         self.balance[receiver] += amount
                     else:
                         result = 'ng'
+    
 
+    def randomly_add_tx_to_new_tx_list(self, th_r):
+        r = random()
+        if r < th_r:
+            c = tuple(self.network.keys() - {self.pk})[randrange(self.n - 1)]
+            d = {
+                "type": "send",
+                "sender": self.pk,
+                "receiver": c,
+                "amount": randrange(100)
+            }
+            self.new_tx_list.append(d)
 
-    def loop1(self, lock):
-        for i in range(100):
-            # sleep(0.01)
-            r = random()
-            if r < 0.05:
-                c = tuple(self.network.keys() - {self.pk})[randrange(self.n - 1)]
-                d = {
-                    "type": "send",
-                    "sender": self.pk,
-                    "receiver": c,
-                    "amount": randrange(100)
-                }
-                with lock:
-                    self.new_tx_list.append(d)
+    def read_out_new_tx_list_to_tx_list_to_be_sent(self):
+        self.tx_list_to_be_sent = deepcopy(self.new_tx_list)
+        self.new_tx_list = []
 
+    async def sync_loop(self, loop):
+        """Update hg and return new event ids in topological order."""
 
-    def loop2(self, lock):
-        for i in range(100):
-            # sleep(0.01)
-            r = random()
-            if r < 0.01:
-                with lock:
-                    self.tx_list_to_be_sent = deepcopy(self.new_tx_list)
-                    self.new_tx_list = []
-                return
-        with lock:
-            self.tx_list_to_be_sent = deepcopy(self.new_tx_list)
-            self.new_tx_list = []
-        return
-
-
-    def main(self):
-        """Main working loop."""
-
-        new = ()
         while True:
-            yield new
             if len(self.transactions) < 500:
-                self.t1 = threading.Thread(target=self.loop1, args=(self.lock, ))
-                self.t2 = threading.Thread(target=self.loop2, args=(self.lock, ))
-                # print('==Thread Started==')
-                self.t1.start()
-                self.t2.start()
-                self.t1.join()
-                self.t2.join()
-                # print('==Thread Ended==')
+                self.randomly_add_tx_to_new_tx_list(0.1)
+                self.read_out_new_tx_list_to_tx_list_to_be_sent()
             else:
                 self.tx_list_to_be_sent = []
+                break  # MUST DELETE
             payload = deepcopy(self.tx_list_to_be_sent)
 
             # pick a random node to sync with but not me
             c = tuple(self.network.keys() - {self.pk})[randrange(self.n - 1)]
-            new = self.sync(c, payload)
+            
+            # new = self.sync(c, payload)
+            
+            info = crypto_sign(dumps({c: self.height[h]
+                    for c, h in self.can_see[self.head].items()}), self.sk)
+            
+            try:
+                reader, writer = \
+                    await asyncio.open_connection(self.network[c], 50020,
+                                                  loop=loop)
+            except:
+                continue
+            
+            # print('Send: %r' % info)
+            writer.write(info)
+            writer.write_eof()
+
+            ret_info = await reader.read(-1)  # receive until EOF (* sender MUST send EOF at the end.)
+            print(f'Received: {ret_info}')  # if needed -> data.decode()
+
+            # print('Close the socket')
+            writer.close()
+
+            
+            msg = crypto_sign_open(ret_info, c)
+
+            remote_head, remote_hg = loads(msg)
+            new = tuple(toposort(remote_hg.keys() - self.hg.keys(),
+                        lambda u: remote_hg[u].p))
+
+            for h in new:
+                ev = remote_hg[h]
+                if self.is_valid_event(h, ev):
+                    self.add_event(h, ev)
+
+
+            if self.is_valid_event(remote_head, remote_hg[remote_head]):
+                h, ev = self.new_event(payload, (self.head, remote_head))
+                # this really shouldn't fail, let's check it to be sure
+                assert self.is_valid_event(h, ev)
+                self.add_event(h, ev)
+                self.head = h
+
+            new = new + (h,)
+            
             self.divide_rounds(new)
 
             new_c = self.decide_fame()
             finals = self.find_order(new_c)
             self.execute_transactions(finals)
+        raise ENDHashgraph()
+
+
+    async def ask_sync_loop(self, loop, sock, pk, info):
+        """Respond to someone wanting to sync (only public method)."""
+
+        # TODO: only send a diff? maybe with the help of self.height
+        # TODO: thread safe? (allow to run while mainloop is running)
+        while True:
+            new_socket, (remote_host, remote_remport) = await loop.sock_accept(sock)
+            new_socket.setblocking(False)
+            # print('[FD:{}]Accept:{}:{}'.format(new_socket.fileno(), remote_host, remote_remport))
+            asyncio.ensure_future(self.recv_send(loop, new_socket, remote_host, remote_remport))
+
+    async def recv_send(self, loop, sock, remote_host, remote_remport):
+        remote_host, remote_remport = sock.getpeername()
+        # print('[FD:{}]Client:{}:{}'.format(sock.fileno(), remote_host, remote_remport))
+
+        full_data = b''
+        while True:
+            data = await loop.sock_recv(sock, 512)
+            if data == b'':
+                # print('[FD:{}]Recv:EOF'.format(sock.fileno()))
+                cs = loads(crypto_sign_open(full_data, self.r_network[remote_host]))
+
+                subset = {h: self.hg[h] for h in bfs(
+                    (self.head,),
+                    lambda u: (p for p in self.hg[u].p
+                            if self.hg[p].c not in cs or self.height[p] > cs[self.hg[p].c]))}
+                msg = dumps((self.head, subset))
+                msg_ret = crypto_sign(msg, self.sk)
+                await loop.sock_sendall(sock, msg_ret)
+                sock.close()
+                break
+
+            # print('[FD:{}]Recv:{}'.format(sock.fileno(), data))
+            full_data += data
+
+    
+    def main_asyncio(self):
+        event_loop = asyncio.SelectorEventLoop()
+        asyncio.set_event_loop(event_loop)
+        server_sock = create_server_socket('0.0.0.0', 50020)
+
+        gather_list = [
+            self.ask_sync_loop(event_loop, server_sock)
+        ]
+        # for shard_id in range(self.n_shards):
+        #     gather_list.append(tcp_echo_client(msg_init, addr, 50010, event_loop))
+        gather_list.append(self.sync_loop(event_loop))
+        gather_tuple = tuple(gather_list)
+        try:
+            event_loop.run_until_complete(
+                asyncio.gather(
+                    *gather_tuple
+                )
+            )
+        except ENDHashgraph:
+            event_loop.close()
+            server_sock.close()
+        except KeyboardInterrupt:
+            event_loop.close()
+            server_sock.close()
     
 
     def test_c(self):
