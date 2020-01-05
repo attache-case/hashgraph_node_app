@@ -447,7 +447,7 @@ class Node:
         """Update hg and return new event ids in topological order."""
 
         while True:
-            print(f'len(txs): {len(self.transactions)}')
+            print(f'len(hg): {len(self.hg)}, len(txs): {len(self.transactions)}')
             t1 = time()
             if len(self.transactions) < 500:
                 self.randomly_add_tx_to_new_tx_list(0.1)
