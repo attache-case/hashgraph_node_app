@@ -510,7 +510,7 @@ class Node:
         raise ENDHashgraph()
 
 
-    async def ask_sync_loop(self, loop, sock, pk, info):
+    async def ask_sync_loop(self, loop, sock):
         """Respond to someone wanting to sync (only public method)."""
 
         # TODO: only send a diff? maybe with the help of self.height
