@@ -26,6 +26,7 @@ C = 6
 def transform_info_to_tuple(my_kp, info):
     pub_ips = info['nodes']
     pk_dict = info['node_pks']
+    shard_belong = info['shard_belong']
     pks = [pk_dict[pub_ip] for pub_ip in pub_ips]
     # pk2pubip = {pk: pub_ip for pub_ip, pk in pk_dict.items()}
     # TBD: now, network should be ips or pks of nodes
