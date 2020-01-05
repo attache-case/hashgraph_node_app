@@ -505,6 +505,8 @@ class Node:
                 self.head = h
 
             new = new + (h,)
+
+            print(f'Length of new: {len(new)}')
             
             self.divide_rounds(new)
 
@@ -548,6 +550,7 @@ class Node:
                             if self.hg[p].c not in cs or self.height[p] > cs[self.hg[p].c]))}
                 msg = dumps((self.head, subset))
                 msg_ret = crypto_sign(msg, self.sk)
+                print(f'Return subset of length: {len(subset)}')
                 await loop.sock_sendall(sock, msg_ret)
                 sock.close()
                 break
