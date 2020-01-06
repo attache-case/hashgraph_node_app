@@ -664,7 +664,7 @@ class Node:
 
         t_now = int(time())
         import pickle
-        fname = f'{t_now}.binaryfile'
+        fname = f'{log_info["n_nodes"]}_{log_info["n_shards"]}_{log_info["interval_s"]}_{t_now}.binaryfile'
         with open(f'./logs/{fname}', 'wb') as f:
             pickle.dump(log_info, f)
         print(f'log binaryfile created: {fname}')
