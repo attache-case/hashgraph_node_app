@@ -14,12 +14,13 @@ def send_init_info(info, dest_ip, dest_port):
     while retry_cnt < 20:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(3)
+                s.settimeout(5)
                 s.connect((dest_ip, dest_port))
 
                 # サーバにメッセージを送る
                 msg_tuple = msg_composer.compose_init_msg(info)
                 s.sendall(msg_processor.create_msg(*msg_tuple))
+                s.sendall(b'')
 
                 # サーバからの文字列を取得する。
                 data = s.recv(msg_processor.MSG_BUF_LEN)
