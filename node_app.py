@@ -34,7 +34,8 @@ if __name__ == "__main__":
         my_info = {}
         my_info['pk'] = my_pk
         my_info['pub_ip'] = pub_ip
-        sender.send_init_info_asyncio(my_info, EC2_MANAGER_ELASTIC_IP, EC2_MANAGER_PORT)
+        sender.send_init_info(my_info, EC2_MANAGER_ELASTIC_IP, EC2_MANAGER_PORT)
+        # sender.send_init_info_asyncio(my_info, EC2_MANAGER_ELASTIC_IP, EC2_MANAGER_PORT)
         print(f'start waiting for TELL...')
         info = receiver.receive_tell_msg()
         print(f'received TELL.')
