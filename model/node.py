@@ -502,7 +502,7 @@ class Node:
                 if conn_fail_count > 100:
                     print(f'Conn fail > 100. break.')
                     break
-                # print(f'open_coneection({self.network[c]}:{50020}) NG.')
+                print(f'open_coneection({self.network[c]}:{50020}) NG.')
                 continue
             
             try:
@@ -614,6 +614,7 @@ class Node:
             self.log_ask_sync_process_time.append(t2-t1)
         except:
             print(f'Exception while recv_send()')
+            sock.close()
 
     
     def main_asyncio(self):
