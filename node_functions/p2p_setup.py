@@ -9,6 +9,9 @@ import queue
 
 # BYTE_EOF = b'\x04'
 
+lock_asyncio = asyncio.Lock()
+
+
 try:
     from node_functions.utils import msg_composer
     from node_functions.utils import msg_processor
@@ -94,7 +97,8 @@ async def tcp_echo_client(message, addr, port, loop,
 
     # print('Close the socket')
     writer.close()
-    sendable_ips.append(addr)
+    async with lock_asyncio:
+        sendable_ips.append(addr)
     print(f'Sendable nodes: {len(sendable_ips)}')
 
 
@@ -137,7 +141,8 @@ async def recv_send(loop, sock, remote_host, remote_remport):
                 msg_ret = b'OK: received your INIT.'
                 pub_ip, pk = msg_parser.parse_init_msg(full_payload)
                 new_addr2pub_ip[remote_host] = pub_ip
-                receivable_ips.append(pub_ip)
+                async with lock_asyncio:
+                    receivable_ips.append(pub_ip)
             else:
                 msg_ret = b'NG: your message was not INIT.'
             await loop.sock_sendall(sock, msg_ret)
