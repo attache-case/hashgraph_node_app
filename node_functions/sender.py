@@ -1,4 +1,6 @@
+from random import random
 import socket
+from time import sleep
 # from tqdm import tqdm
 
 from node_functions.utils import msg_processor
@@ -9,7 +11,7 @@ def send_init_info(info, dest_ip, dest_port):
     マネージャノードに自身の情報を伝える
     """
     retry_cnt = 0
-    while retry_cnt < 10:
+    while retry_cnt < 20:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(3)
@@ -27,8 +29,10 @@ def send_init_info(info, dest_ip, dest_port):
         except socket.timeout:
             print(f'send INIT timeout')
             retry_cnt += 1
+            sleep(5*random())
             continue
         except Exception as e:
             print(e)
             retry_cnt += 1
+            sleep(5*random())
             continue
