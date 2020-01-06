@@ -494,7 +494,7 @@ class Node:
                 reader, writer = \
                     await asyncio.open_connection(self.network[c], 50020,
                                                   loop=loop)
-                # print(f'open_coneection({self.network[c]}:{50020}) OK.')
+                print(f'open_coneection({self.network[c]}:{50020}) OK.')
             except:
                 conn_fail_count += 1
                 if conn_fail_count > 10:
